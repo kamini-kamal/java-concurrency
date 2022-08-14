@@ -1,0 +1,89 @@
+https://www.baeldung.com/java-fork-join
+
+
+Fork-join framework#
+There are new Java concurrency APIs (JSR 166y) referred to as the Fork-join framework. It is designed for tasks that can be broken down and takes advantage of multiple processors. The following are the core classes (all located in java.util.concurrent):
+
+ForkJoinPool: An ExecutorService for running ForkJoinTasks and managing and monitoring the tasks.
+ForkJoinTask: This represents the abstract task that runs within the ForkJoinPool.
+RecursiveTask: This is a subclass of ForkJoinTask whose compute method returns some value.
+RecursiveAction: This is a subclass of ForkJoinTask whose compute method does not return any value.
+/////////
+
+package com.adamldavis.java.forkjoin;
+import java.util.concurrent.RecursiveTask;
+
+class SumCalculatorTask extends RecursiveTask<Integer>{
+    int [] numbers;
+    SumCalculatorTask(int[] numbers){
+        this.numbers = numbers;
+    }
+    
+    @Override
+    protected Integer compute() {
+        int sum = 0;
+        for (int i : numbers){
+            sum += i;
+        }
+        return sum;
+    }
+}
+////////
+package com.adamldavis.java.forkjoin;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.RecursiveTask;
+
+class NumberDividerTask extends RecursiveTask<Integer> {
+    int[] numbers;
+
+    NumberDividerTask(int[] numbers) {
+        this.numbers = numbers;
+    }
+
+    @Override
+    protected Integer compute() {
+        int sum = 0;
+        List<RecursiveTask<Integer>> forks = new ArrayList<>();
+        if (numbers.length > 20) {
+            NumberDividerTask task1 = new NumberDividerTask(Arrays.copyOfRange(
+                    numbers, 0, numbers.length / 2));
+            NumberDividerTask task2 = new NumberDividerTask(Arrays.copyOfRange(
+                    numbers, numbers.length / 2, numbers.length));
+            forks.add(task1);
+            forks.add(task2);
+            task1.fork();
+            task2.fork();
+        } else {
+            SumCalculatorTask sumCalculatorTask = new SumCalculatorTask(numbers);
+            forks.add(sumCalculatorTask);
+            sumCalculatorTask.fork();
+        }
+        // Combine the result from all the tasks
+        for (RecursiveTask<Integer> task : forks) {
+            sum += task.join();
+        }
+        return sum;
+    }
+}
+
+package com.adamldavis.java.forkjoin;
+import java.util.concurrent.ForkJoinPool;
+
+public class ForkJoinTest {
+    static ForkJoinPool forkJoinPool = new ForkJoinPool();
+    public static final int LENGTH = 2000;
+    
+    public static void main(String[] args) {
+        int [] numbers = new int[LENGTH];
+        // Create  an array with some values. 
+        for(int i=0; i<LENGTH; i++){
+            numbers[i] = i * 2;
+        }
+        int sum = forkJoinPool.invoke(new NumberDividerTask(numbers));
+      
+        System.out.println("Sum: "+sum);
+    }
+}
